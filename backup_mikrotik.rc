@@ -1,0 +1,18 @@
+ /file remove number=[find name~"^Week*"];\
+       :local ishDate [/system clock get date];:local month [:pick $ishDate 0 3];\
+       :local day [:pick $ishDate 4 6];:local year [:pick $ishDate 7 11];\
+       :local prepDate ($year.$month.$day);\
+       :local mothArr [:toarray "jan,feb,mar,apr,may,jun,jul,aug,sep,oct,nov,dec"];\
+       :local intMonth;\
+       :foreach i in=$mothArr do={if ($i=$month) do={:set $intMonth ([:find $mothArr $month]+1)}};\
+       :local lenMonth [:len $intMonth];\
+       :if ($lenMonth < 2) do={:set $intMonth ("0".$intMonth)};\
+       :local fullDate ($year.$intMonth.$day);\
+       :tonum $fullDate;\
+       /system backup save name="WeekBackup-$fullDate";\
+       :local nameFile [/file get number=[/file find name~"^Week*"]];\
+       :set $nameFile ($nameFile -> "name");\
+       :local identy [/system identity get name];
+       /tool e-mail send to="******" server="*****" port=25\
+       user="*******" password="*****" from="******" subject="Backup weekly from $identy"\
+       body="Weekly backup config from $identy router" file=$nameFile;
