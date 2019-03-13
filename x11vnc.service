@@ -1,0 +1,13 @@
+[Unit]
+Description=x11vnc-server
+After=network-online.target
+
+[Service]
+Environment=XDG_SEAT_PATH=/org/freedesktop/DisplayManager/Seat0
+ExecStart=/usr/bin/x11vnc -display :0 -forever -listen 0.0.0.0 -rfbauth /root/.vnc/passwd -auth /var/run/lightdm/root/:0 -gone 'systemctl restart lightdm.service' -o /var/log/x11vnc.log 
+#ExecStart=/usr/bin/x11vnc -display :0 -scale 1920x1080 -forever -listen 0.0.0.0 -rfbauth /root/.vnc/passwd -auth /var/lib/lightdm/.Xauthority -gone 'dm-tool lock &' -o /var/log/x11vnc.log 
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
