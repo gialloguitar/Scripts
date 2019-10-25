@@ -15,7 +15,9 @@ set -e
 TS=$(date +'%H:%M:%S-%d:%m:%Y')
 LOG="/opt/eco/paas-39/fluentd_fault.log"
 OS_USER="Vladimir_Pereskokov@epam.com"
-OS_PASS="****"
+OS_PASS="100indeec$"
+ANSIBLE_DIR="/opt/eco/ansible/inventory-paas"
+cd $ANSIBLE_DIR     # needed for custom ansible.cfg
 USAGE="\n
 Wrong options \n
 \n
@@ -28,13 +30,13 @@ SCRIPTNAME <dev|prod> check - that command use for check count of ouput buffers 
 case "$1" in
 dev )
 # 3.11 Dev
-ANSIBLE_INVENTORY="/opt/eco/ansible/inventory-paas/inventories/hosts-paas-311-develop"
+ANSIBLE_INVENTORY="$ANSIBLE_DIR/inventories/hosts-paas-311-develop"
 OS_HOST="https://web.paas.lab.epam.com:8443"
 LOGGING_PROJ="openshift-logging"
 ;;
 prod )
 # 3.9 Prod
-ANSIBLE_INVENTORY="/opt/eco/ansible/inventory-paas/inventories/hosts-paas-39"
+ANSIBLE_INVENTORY="$ANSIBLE_DIR/inventories/hosts-paas-39"
 OS_HOST="https://console.39.paas.epm-eco.projects.epam.com:8443"
 LOGGING_PROJ="logging"
 ;;
@@ -53,7 +55,7 @@ sleep 10
 done
 exit 0
 ;;
-*)
++*)
 echo -e $USAGE
 exit 0
 ;;
