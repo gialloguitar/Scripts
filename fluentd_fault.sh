@@ -16,7 +16,7 @@ WORKDIR=$(pwd)
 TS=$(date +'%H:%M:%S-%d:%m:%Y')
 LOG="$WORKDIR/fluentd_fault.log"    # Output LOG
 OS_USER="Vladimir_Pereskokov@epam.com"
-OS_PASS="100indeec$"
+OS_PASS="******"
 ANSIBLE_DIR="/opt/eco/ansible/inventory-paas"
 cd $ANSIBLE_DIR     # needed for custom ansible.cfg
 USAGE="\n
