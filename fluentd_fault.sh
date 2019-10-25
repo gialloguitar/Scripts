@@ -1,10 +1,10 @@
 #!/bin/bash
 # 
-# That script look for all hung fluentd pods on cluster with different envorinment DEV or PROD, redeploy them and delete all old ouput buffers as only them to reach count 33.
+# That script look for all hung fluentd pods on cluster with different envorinment DEV or PROD, redeploy them and delete all oo reld ouput buffers as only them reach count 33.
 # Also, you can use it in CHECK mode for display count of output buffer files of fluentd pods with interval 10s. 
 #
 # Usage:
-# SCRIPTNAME <dev|prod> - that command is redepoy all hung fluentd pods and delete all old output buffers.
+# SCRIPTNAME <dev|prod> - that command is redeploy all hung fluentd pods and delete all old output buffers.
 # SCRIPTNAME <dev|prod> check - that command use for check count of ouput buffers on node
 #
 # Author: Pereskokov Vladimir
