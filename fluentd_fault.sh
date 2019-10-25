@@ -10,10 +10,11 @@
 # Author: Pereskokov Vladimir
 
 
-set -e
+#set -e
 
+WORKDIR=$(pwd)
 TS=$(date +'%H:%M:%S-%d:%m:%Y')
-LOG="/opt/eco/paas-39/fluentd_fault.log"
+LOG="$WORKDIR/fluentd_fault.log"    # Output LOG
 OS_USER="Vladimir_Pereskokov@epam.com"
 OS_PASS="100indeec$"
 ANSIBLE_DIR="/opt/eco/ansible/inventory-paas"
