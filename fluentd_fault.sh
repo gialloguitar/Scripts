@@ -15,7 +15,8 @@
 WORKDIR=$(pwd)
 TS=$(date +'%H:%M:%S-%d:%m:%Y')
 LOG="$WORKDIR/fluentd_fault.log"    # Output LOG
-OS_USER="Vladimir_Pereskokov@epam.com"
+USER="vladimir_pereskokov"
+OS_USER="$USER@epam.com"
 OS_PASS="******"
 ANSIBLE_DIR="/opt/eco/ansible/inventory-paas"
 cd $ANSIBLE_DIR     # needed for custom ansible.cfg
@@ -51,7 +52,7 @@ case "$2" in
 check )
 while true; do
 echo "Check $1 environment..."
-ansible nodes -u vladimir_pereskokov -i $ANSIBLE_INVENTORY -o -m shell -a "ls /var/lib/fluentd | wc -l "| awk '{if($8 > 32) { print "Node " tolower($1 " has " $8 " output buffers")}}'
+ansible nodes -u $USER -i $ANSIBLE_INVENTORY -o -m shell -a "ls /var/lib/fluentd | wc -l "| awk '{if($8 > 32) { print "Node " tolower($1 " has " $8 " output buffers")}}'
 sleep 10
 done
 exit 0
@@ -80,7 +81,7 @@ os_context=$(oc whoami --show-context)
 echo "$TS - $os_context" > $LOG
 
 # if flunentd output buffers count will reach to 33, it pod will considered is hung
-fault_nodes=$(ansible nodes -u vladimir_pereskokov -i $ANSIBLE_INVENTORY -o -m shell -a "ls /var/lib/fluentd | wc -l "| \
+fault_nodes=$(ansible nodes -u $USER -i $ANSIBLE_INVENTORY -o -m shell -a "ls /var/lib/fluentd | wc -l "| \
 awk '{if($8 > 32) { print tolower($1)}}')
 count_of_fault_pods=${#fault_nodes[@]}
 #echo "Num of fault pods is $count_of_fault_pods"
@@ -93,7 +94,7 @@ for node in ${fault_nodes[@]}; do
   fault_pod=$(oc adm manage-node --list-pods $node 2>/dev/null | grep fluentd | awk '{print $2}')
   echo "$i) Node $node has a hung fluentd pod $fault_pod" | tee -a $LOG
   # Delete old buffers and hung pods
-  ssh vladimir_pereskokov@$node sudo rm -f /var/lib/fluentd/*
+  ssh $USER@$node sudo rm -f /var/lib/fluentd/*
   oc delete pod $fault_pod --wait=false
 done
 echo "All hung fluentd pods were deleted" >> $LOG
