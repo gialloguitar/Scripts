@@ -1,11 +1,29 @@
 #!/bin/bash
+# 
+# That script look for all hung fluentd pods on cluster with different envorinment DEV or PROD, redeploy them and delete all old ouput buffers as only them to reach count 33.
+# Also, you can use it in CHECK mode for display count of output buffer files of fluentd pods with interval 10s. 
+#
+# Usage:
+# SCRIPTNAME <dev|prod> - that command is redepoy all hung fluentd pods and delete all old output buffers.
+# SCRIPTNAME <dev|prod> check - that command use for check count of ouput buffers on node
+#
+# Author: Pereskokov Vladimir
+
 
 set -e
 
 TS=$(date +'%H:%M:%S-%d:%m:%Y')
 LOG="/opt/eco/paas-39/fluentd_fault.log"
 OS_USER="Vladimir_Pereskokov@epam.com"
-OS_PASS="******"
+OS_PASS="****"
+USAGE="\n
+Wrong options \n
+\n
+Use:\n 
+\n
+SCRIPTNAME <dev|prod> - that command is redepoy all hung fluentd pods and delete all old output buffers. \n
+\n
+SCRIPTNAME <dev|prod> check - that command use for check count of ouput buffers on node\n"
 
 case "$1" in
 dev )
@@ -21,7 +39,22 @@ OS_HOST="https://console.39.paas.epm-eco.projects.epam.com:8443"
 LOGGING_PROJ="logging"
 ;;
 *) 
-echo "Wrong env. Use: dev od prod"
+echo -e $USAGE
+exit 0
+;;
+esac
+
+case "$2" in
+check )
+while true; do
+echo "Check $1 environment..."
+ansible nodes -u vladimir_pereskokov -i $ANSIBLE_INVENTORY -o -m shell -a "ls /var/lib/fluentd | wc -l "| awk '{if($8 > 32) { print "Node " tolower($1 " has " $8 " output buffers")}}'
+sleep 10
+done
+exit 0
+;;
+*)
+echo -e $USAGE
 exit 0
 ;;
 esac
@@ -47,13 +80,7 @@ echo "$TS - $os_context" > $LOG
 fault_nodes=$(ansible nodes -u vladimir_pereskokov -i $ANSIBLE_INVENTORY -o -m shell -a "ls /var/lib/fluentd | wc -l "| \
 awk '{if($8 > 32) { print tolower($1)}}')
 count_of_fault_pods=${#fault_nodes[@]}
-echo "Num of fault pods is $count_of_fault_pods"
-
-# while true; do
-# echo "Num of fault nodes is ${#fault_nodes[@]}"
-# ansible nodes -u vladimir_pereskokov -i $ANSIBLE_INVENTORY -o -m shell -a "ls /var/lib/fluentd | wc -l "| awk '{if($8 > 32) { print tolower($1 " -> " $8)}}'
-# sleep 10
-# done 
+#echo "Num of fault pods is $count_of_fault_pods"
 
 if [ $count_of_fault_pods > 0 ]; then
   
@@ -68,7 +95,6 @@ for node in ${fault_nodes[@]}; do
 done
 echo "All hung fluentd pods were deleted" >> $LOG
 fi
-
 
 oc logout
 
