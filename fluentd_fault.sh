@@ -1,6 +1,6 @@
 #!/bin/bash
 # 
-# That script look for all hung fluentd pods on cluster with different envorinment DEV or PROD, redeploy them and delete all oo reld ouput buffers as only them reach count 33.
+# That script look for all hung fluentd pods on cluster with different envorinment DEV or PROD, redeploy them and delete all old output buffers as only them reach count 33.
 # Also, you can use it in CHECK mode for display count of output buffer files of fluentd pods with interval 10s. 
 #
 # Usage:
@@ -10,24 +10,24 @@
 # Author: Pereskokov Vladimir
 
 
-#set -e
+#set -x
 
-WORKDIR=$(pwd)
+WORKDIR="/opt/eco/paas-39/fluentd"
 TS=$(date +'%H:%M:%S-%d:%m:%Y')
-LOG="$WORKDIR/fluentd_fault.log"    # Output LOG
 USER="vladimir_pereskokov"
 OS_USER="$USER@epam.com"
-OS_PASS="******"
+OS_PASS="100indeec$"
 ANSIBLE_DIR="/opt/eco/ansible/inventory-paas"
-cd $ANSIBLE_DIR     # needed for custom ansible.cfg
 USAGE="\n
 Wrong options \n
 \n
 Use:\n 
 \n
-SCRIPTNAME <dev|prod> - that command is redepoy all hung fluentd pods and delete all old output buffers. \n
+SCRIPTNAME <dev|prod> - that command is redeploy all hung fluentd pods and delete all old output buffers. \n
 \n
-SCRIPTNAME <dev|prod> check - that command use for check count of ouput buffers on node\n"
+SCRIPTNAME <dev|prod> check - that command use for check count of output buffers on node\n"
+
+cd $ANSIBLE_DIR     # needed for custom ansible.cfg
 
 case "$1" in
 dev )
@@ -53,11 +53,12 @@ check )
 while true; do
 echo "Check $1 environment..."
 ansible nodes -u $USER -i $ANSIBLE_INVENTORY -o -m shell -a "ls /var/lib/fluentd | wc -l "| awk '{if($8 > 32) { print "Node " tolower($1 " has " $8 " output buffers")}}'
+echo "---"
 sleep 10
 done
 exit 0
 ;;
-+*)
+[!^$]*)
 echo -e $USAGE
 exit 0
 ;;
@@ -78,26 +79,27 @@ fi
 
 oc project $LOGGING_PROJ
 os_context=$(oc whoami --show-context)
-echo "$TS - $os_context" > $LOG
+echo "$TS - $os_context"
 
 # if flunentd output buffers count will reach to 33, it pod will considered is hung
-fault_nodes=$(ansible nodes -u $USER -i $ANSIBLE_INVENTORY -o -m shell -a "ls /var/lib/fluentd | wc -l "| \
-awk '{if($8 > 32) { print tolower($1)}}')
+fault_nodes=( $(ansible nodes -u $USER -i $ANSIBLE_INVENTORY -o -m shell -a "ls /var/lib/fluentd | wc -l "| \
+awk '{if($8 > 32) { print tolower($1)}}') )
 count_of_fault_pods=${#fault_nodes[@]}
-#echo "Num of fault pods is $count_of_fault_pods"
 
 if [ $count_of_fault_pods > 0 ]; then
-  
+echo "Num of fault pods is $count_of_fault_pods" 
 i=0
 for node in ${fault_nodes[@]}; do
   ((i=i+1))
   fault_pod=$(oc adm manage-node --list-pods $node 2>/dev/null | grep fluentd | awk '{print $2}')
-  echo "$i) Node $node has a hung fluentd pod $fault_pod" | tee -a $LOG
+  echo "$i) Node $node has a hung fluentd pod $fault_pod"
   # Delete old buffers and hung pods
   ssh $USER@$node sudo rm -f /var/lib/fluentd/*
   oc delete pod $fault_pod --wait=false
+  echo "Pod $fault_pod was deleted"
 done
-echo "All hung fluentd pods were deleted" >> $LOG
+else
+echo "Hung pods was not detected"
 fi
 
 oc logout
