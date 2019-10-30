@@ -86,7 +86,7 @@ fault_nodes=( $(ansible nodes -u $USER -i $ANSIBLE_INVENTORY -o -m shell -a "ls 
 awk '{if($8 > 32) { print tolower($1)}}') )
 count_of_fault_pods=${#fault_nodes[@]}
 
-if [ $count_of_fault_pods > 0 ]; then
+if [[ $count_of_fault_pods > 0 ]]; then
 echo "Num of fault pods is $count_of_fault_pods" 
 i=0
 for node in ${fault_nodes[@]}; do
@@ -96,7 +96,7 @@ for node in ${fault_nodes[@]}; do
   # Delete old buffers and hung pods
   ssh $USER@$node sudo rm -f /var/lib/fluentd/*
   oc delete pod $fault_pod --wait=false
-  echo "Pod $fault_pod was deleted"
+  #echo "Pod $fault_pod was deleted"
 done
 else
 echo "Hung pods was not detected"
