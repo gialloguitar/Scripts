@@ -16,7 +16,7 @@ DBUSER="*****"
 DBPASS="*****"
 DBHOST="localhost"
 #databases and sites for backup
-DBASES=('social_st' 'social_pr')
+DBASES=('social_st' 'social_pr')  #
 SITES=('social')
 #mount path
 MPATH="/media/"
