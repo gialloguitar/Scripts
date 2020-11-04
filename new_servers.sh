@@ -3,7 +3,7 @@
 # Applying new servers frokm AH provider
 #   1. Change root passwd
 #   2. Change ssh port
-#   3. Put and run ansible init script  
+#   3. Put and run ansible init script
 #   4. Set hostname
 #   5. Reboot server
 
@@ -15,7 +15,7 @@ read -r CON_PORT
 SSH_TO="ssh -p$CON_PORT root@"
 SCP_TO="scp -P$CON_PORT "
 SERVERS=( $(cat new_servers.txt) )
-ANSIBLE_INIT_SCRIPT='/opt/wisebits/ansible/scripts/init.sh'
+ANSIBLE_INIT_SCRIPT='/Users/markule/Workspace/wisebits/ansible/scripts/init.sh'
 PROMPT=''
 
 for IP in ${SERVERS[@]}; do
@@ -33,6 +33,9 @@ echo -e "Ignore passwd \r\n"
 fi
 PROMPT=''
 
+echo -e "Current SSH port from config\n"
+$SSH_TO$IP grep Port /etc/ssh/sshd_config
+
 echo -e "# 2. Change ssh port: Yes/No \n"
 read -r PROMPT
 if [ $PROMPT == 'Yes' ]; then
@@ -48,7 +51,7 @@ PROMPT=''
 echo -e "# 3. Put and run ansible init script: Yes/No \n"
 read -r PROMPT
 if [ $PROMPT == 'Yes' ]; then
-$SCP_TO $ANSIBLE_INIT_SCRIPT $IP:~
+$SCP_TO $ANSIBLE_INIT_SCRIPT root@$IP:~
 $SSH_TO$IP /root/init.sh
 else
 echo -e "Ignore init.sh \r\n"
@@ -83,6 +86,3 @@ echo -e "\r\n\n"
 done
 
 echo -e "Finish \r\n"
-
-
-
