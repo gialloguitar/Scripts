@@ -30,8 +30,8 @@ options:
     gitlab_url:
         description:
             - URL to your GitLab installation
-        default: None
-        required: true
+        default: gitlab.stripchat.dev
+        required: false
     api_token:
         description:
             - GitLab token for accessing to API with read/write permissions.
@@ -50,9 +50,13 @@ options:
     state:
         description:
             - Allow to manage with three different runners state 'present', 'absent', 'cleanup'
-        default: cleanup
-        required: None
-
+        default: None
+        required: true
+    run_untagged:
+        description:
+            - Allow or prevent run untagged jobs with a runner
+        default: True
+        requred: false
 author:
     - Vladimir Pereskokov (@markule)
 '''
@@ -60,35 +64,34 @@ author:
 EXAMPLES = '''
 - name: Create and registrate new runner via API on your GitLab instance, ensure that you have registered output for runner's auth token (neccesarry in config.toml)
   gitlab_runner_force:
-    gitlab_url: 'gitlab.example.com'
-    name: "build-runner-01"
-    api_token: "abc123"
-    reg_token: 'xyz456'
-    tag_list: 'test, build, deploy'
-    state: present
+     gitlab_url: 'gitlab.example.com'
+     name: "build-runner-01"
+     api_token: "abc123"
+     reg_token: 'xyz456'
+     tag_list: 'test, build, deploy'
+     state: present
   register: output
 
-- name: Update and apply new tags to runner from default GitLab URL (gitlab.stripchat.dev)
+- name: Update and apply new tags to runner and prevent run untagged jobs from default GitLab URL (gitlab.stripchat.dev)
   gitlab_runner_force:
-    gitlab_url: 'gitlab.example.com'
-    name: "build-runner-01"
-    api_token: "abc123"
-    tag_list: 'test, build'
-    state: present
+     name: "build-runner-01"
+     api_token: "abc123"
+     tag_list: 'test, build'
+     run_untagged: False
+     state: present
 
-- name: Cleanup API from orphaned runners which in 'not_connected' status, for avoiding extra requests call module with 'run_once: true' feature.
+- name: Cleanup API from orphaned runners which in 'not_connected' and 'offline' status, for avoiding extra requests call module with 'run_once: true' feature.
   gitlab_runner_force:
-    gitlab_url: "gitlab.example.com"
-    api_token: "abc123"
-    state: cleanup
+     api_token: "abc123"
+     state: cleanup
   run_once: true
 
 - name: Remove and unregistrate from API of your GitLab installation runner with 'name'
   gitlab_runner_force:
-    gitlab_url: "gitlab.example.com"
-    name: "test-runner-01"
-    api_token: "abc123"
-    state: absent
+     gitlab_url: "gitlab.example.com"
+     name: "test-runner-01"
+     api_token: "abc123"
+     state: absent
 '''
 
 RETURN = '''
@@ -101,12 +104,10 @@ message: Registration of new runner with a next tags: 'build'
 
 GITLAB_URL = 'gitlab.com'
 RUNNERS_ENDPOINT = '/api/v4/runners'
-ACTIONS = ['present', 'absent', 'cleanup']
 MSG = {
-    'states'          : 'Module takes a following states argument values: \'{state}\'. Unrecognized action:'.format(state = ", ".join(ACTIONS)),
-    'reg_token'       : 'For creating a new runner you have to provide valid registration token \'reg_token\' from your Gitlab installation',
+    'reg_token'       : 'For creating a new runner you have to provide valid registration token \'reg_token\' from your Gitlab installation and \'name\' of runner',
     'del_status'      : 'With the successful deletion of runner, status code has to equal 204, but obtained:',
-    'check_mode'      : 'Unavailable in check mode',
+    'check_mode'      : 'Any API write operations is unavailable in check mode',
     'create'          : 'Registration of new runner with a next tags:',
     'update'          : 'Update runner\'s tags:',
     'exist'           : 'Runner\'s already exist with a following tags:',
@@ -121,12 +122,13 @@ def gitlab_runner():
 
     module = AnsibleModule(
         argument_spec = dict(
-            gitlab_url      = dict(required=False, default=GITLAB_URL),
-            name            = dict(required=False, default=''),
-            api_token       = dict(required=True),
-            reg_token       = dict(required=False, default=''),
-            tag_list        = dict(required=False, default=''),
-            state           = dict(required=True)
+            gitlab_url      = dict(required = False, default = GITLAB_URL),
+            name            = dict(required = False, default = ''),
+            api_token       = dict(required = True),
+            reg_token       = dict(required = False, default = ''),
+            run_untagged    = dict(required = False, default = True, type = 'bool' ),
+            tag_list        = dict(required = False, default = ''),
+            state           = dict(required = True, choices = ['present', 'absent', 'cleanup'] )
         ),
         supports_check_mode = True
     )
@@ -135,6 +137,7 @@ def gitlab_runner():
     name            = str(module.params['name'])
     api_token       = str(module.params['api_token'])
     reg_token       = str(module.params['reg_token'])
+    run_untagged    = bool(module.params['run_untagged'])
     tag_list        = str(module.params['tag_list'])
     state           = str(module.params['state']).lower()
 
@@ -147,25 +150,22 @@ def gitlab_runner():
         response = ''
     )
 
-    if state not in ACTIONS:
-        state_msg = '{msg} \'{state}\''.format(msg = MSG['states'], state = state)
-        module.fail_json(msg = state_msg)
-
-
     runner_id  = get_id(name, get_runners(api_url, api_token))
 
 
     if state == 'present':
         if runner_id == 0:
             # Create a new
+            if len(reg_token.strip()) == 0 or len(name.strip()) == 0:
+                module.fail_json(msg = MSG['reg_token'])
             result['changed']  = True
             result['message']  = '{msg} \'{tags}\''.format(msg = MSG['create'], tags = tag_list)
-            result['response'] = MSG['check_mode'] if module.check_mode else create_runner(module, api_url, api_token, name, reg_token, tag_list)
-            module.exit_json(**result)
+            result['response'] = MSG['check_mode'] if module.check_mode else create_runner(module, api_url, api_token, name, runner_id, reg_token, tag_list, run_untagged)
         else:
             details    = get_runner_details(api_url, api_token, runner_id)
-            old_tags_lst = details['tag_list']
-            old_tags   = ",".join(old_tags_lst)
+            old_run_untagged = details['run_untagged']
+            old_tags_lst     = details['tag_list']
+            old_tags         = ",".join(old_tags_lst)
 
             tag_list_lst = tag_list.split(',')
             tag_list_lst = [ i.strip(' ') for i in tag_list_lst ]
@@ -174,13 +174,16 @@ def gitlab_runner():
                 # Update tags
                 result['changed']  = True
                 result['message']  = '{msg} \'{old_tags}\' to \'{tags}\''.format(msg = MSG['update'], old_tags = old_tags, tags = tag_list)
-                result['response'] = MSG['check_mode'] if module.check_mode else  put_tags_runner(api_url, api_token, runner_id, tag_list)
-                module.exit_json(**result)
+                result['response'] = MSG['check_mode'] if module.check_mode else  update_tags(api_url, api_token, runner_id, tag_list)
+
             elif set(old_tags_lst) == set(tag_list_lst):
                 # Already exist
                 result['changed']  = False
                 result['message']  = '{msg} \'{tags}\''.format(msg = MSG['exist'], tags = tag_list)
-                module.exit_json(**result)
+
+            if  old_run_untagged != run_untagged:
+                result['untagged'] =  MSG['check_mode'] if module.check_mode else  set_run_untagged(api_url, api_token, runner_id, run_untagged)
+
 
     if state == 'absent':
         if runner_id > 0:
@@ -188,20 +191,15 @@ def gitlab_runner():
             result['changed']  = True
             result['message']  = '{msg} \'{tags}\''.format(msg = MSG['delete'], tags = tag_list)
             result['response'] = MSG['check_mode'] if module.check_mode else  delete_runner(api_url, api_token, runner_id)
-
             if result['response'] != 204 and not module.check_mode:
                 module.fail_json(msg = MSG['del_status'])
-
-            module.exit_json(**result)
         else:
             # Runner doesn't exist
             result['changed'] = False
             result['message'] = '{msg} \'{tags}\''.format(msg = MSG['absent'], tags = tag_list)
-            module.exit_json(**result)
 
     if state == 'cleanup':
         orphaned_runners = get_orph_runners(api_url, api_token)
-
         if len(orphaned_runners) > 0:
             # Some oprhaned runners have been deleted
             result['changed']  = True
@@ -218,37 +216,40 @@ def gitlab_runner():
                 if len(wrong_status_dict) > 0:
                     fail_msg = '{msg} {runners}'.format(msg = MSG['del_status'], runners = wrong_status_dict )
                     module.fail_json(msg = fail_msg)
-
-            module.exit_json(**result)
         else:
             # Orphaned runners hasn't been discovered
             result['changed']  = False
             result['message']  = MSG['orph_not_detect']
             result['response'] = MSG['check_mode'] if module.check_mode else delete_orph_runners(api_url, api_token, orphaned_runners)
-            module.exit_json(**result)
 
-def create_runner(module, api_url, api_token, name, reg_token, tag_list):
-    if reg_token == '':
-        module.fail_json(msg=MSG['reg_token'])
-    r = requests.post(api_url, headers={ 'PRIVATE-TOKEN': api_token }, data={ 'token': reg_token, 'description': name, 'tag_list': tag_list } )
+    module.exit_json(**result)
+
+def create_runner(module, api_url, api_token, name, runner_id, reg_token, tag_list, run_untagged):
+    r = requests.post(api_url, headers = { 'PRIVATE-TOKEN': api_token }, data = { 'token': reg_token, 'description': name, 'tag_list': tag_list , 'run_untagged': run_untagged } )
     js = json.loads(r.text)
     return js
 
-def put_tags_runner(api_url, api_token, runner_id, tag_list):
-    api_query = '{api_url}/{id}'.format(api_url=api_url, id=runner_id)
-    r = requests.put(api_query, headers={ 'PRIVATE-TOKEN': api_token }, data={ 'tag_list': tag_list } )
+def update_tags(api_url, api_token, runner_id, tag_list):
+    api_query = '{api_url}/{id}'.format(api_url = api_url, id = runner_id)
+    r = requests.put(api_query, headers = { 'PRIVATE-TOKEN': api_token }, data = { 'tag_list': tag_list } )
     js = json.loads(r.text)
     return js
+
+def set_run_untagged(api_url, api_token, runner_id, run_untagged):
+    api_query = '{api_url}/{id}'.format(api_url = api_url, id = runner_id)
+    requests.put(api_query, headers = { 'PRIVATE-TOKEN': api_token }, data = { 'run_untagged': run_untagged } )
+    resp = "Run untagged jobs set to: {untagged}".format(untagged = run_untagged)
+    return resp
 
 def delete_runner(api_url, api_token, runner_id):
-    api_query = '{api_url}/{id}'.format(api_url=api_url, id=runner_id)
-    r = requests.delete(api_query, headers={ 'PRIVATE-TOKEN': api_token } )
+    api_query = '{api_url}/{id}'.format(api_url = api_url, id = runner_id)
+    r = requests.delete(api_query, headers = { 'PRIVATE-TOKEN': api_token } )
     return r.status_code
 
 def delete_orph_runners(api_url, api_token, orphaned_runners):
     delete_status_codes = {}
     for runner_id in orphaned_runners:
-        api_query = '{api_url}/{id}'.format(api_url=api_url, id=runner_id)
+        api_query = '{api_url}/{id}'.format(api_url = api_url, id = runner_id)
         r = requests.delete(api_query, headers={ 'PRIVATE-TOKEN': api_token })
         rid = 'Runner_{id}'.format( id = runner_id )
         st  = str(r.status_code)
@@ -256,19 +257,19 @@ def delete_orph_runners(api_url, api_token, orphaned_runners):
     return delete_status_codes
 
 def get_orph_runners(api_url, api_token ):
-    api_query = '{api_url}/all?per_page=500'.format(api_url=api_url)
+    api_query = '{api_url}/all?per_page=500'.format(api_url = api_url)
     r = requests.get(api_query, headers={ 'PRIVATE-TOKEN': api_token } )
     js = json.loads(r.text)
     all_orph_runners = []
 
     for node in js:
-        if node['status'] == 'not_connected':
+        if node['status'] == 'not_connected' or node['status'] == 'offline':
             all_orph_runners.append(str(node['id']))
 
     return all_orph_runners
 
 def get_runners(api_url, api_token):
-    api_query = '{api_url}/all?per_page=500'.format(api_url=api_url)
+    api_query = '{api_url}/all?per_page=500'.format(api_url = api_url)
     r = requests.get(api_query, headers={ 'PRIVATE-TOKEN': api_token } )
     js = json.loads(r.text)
     all_runners = {}
@@ -279,7 +280,7 @@ def get_runners(api_url, api_token):
     return all_runners
 
 def get_runner_details(api_url, api_token, runner_id,):
-    api_query = '{api_url}/{id}'.format(api_url=api_url, id=runner_id)
+    api_query = '{api_url}/{id}'.format(api_url = api_url, id = runner_id)
     r = requests.get(api_query, headers={ 'PRIVATE-TOKEN': api_token } )
     js = json.loads(r.text)
     return js
