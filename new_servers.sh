@@ -9,11 +9,6 @@
 
 set -e
 
-echo -e "Set connection ssh port:\n"
-read -r CON_PORT
-
-SSH_TO="ssh -p$CON_PORT root@"
-SCP_TO="scp -P$CON_PORT "
 SERVERS=( $(cat new_servers.txt) )
 ANSIBLE_INIT_SCRIPT='/Users/markule/Workspace/wisebits/ansible/scripts/init.sh'
 PROMPT=''
@@ -21,6 +16,11 @@ PROMPT=''
 for IP in ${SERVERS[@]}; do
 
 echo -e "\r\nServer $IP \n"
+echo -e "Set connection ssh port:\n"
+read -r CON_PORT
+
+SSH_TO="ssh -p$CON_PORT root@"
+SCP_TO="scp -P$CON_PORT "
 
 echo -e "# 1. Change root password prompt: Yes/No \n"
 read -r PROMPT
