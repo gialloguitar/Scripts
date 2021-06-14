@@ -13,9 +13,10 @@ Additional features:\n
 -d - Dry-run mode (default: false)\n
 -m - Moving archives to dir. Folder for placing of all compressed Cold logs, by default store comressed logs in same folder as logs (default: false)\n
 -s - IP or DNS of NFS server. To form valid remoted mount pont use with  -r option. It will be use command 'mount -t nfs <IP>:<REMOVING_DIR> /tmp/<TEMPORARY_MOUNTED_DIR>'\n
+-b - Bandwith limit as rsync argument, see 'rsync --help'  (default: unlimit)\n
 \n
 Example:
-logrotate.sh -l '/home/logs/*.log' -o www-data -g www-data -h 7 -c 24 -d true -m '/backup/logs' -s '192.168.0.1'
+logrotate.sh -l '/home/logs/*.log' -o www-data -g www-data -h 7 -c 24 -d true -m '/backup/logs' -s '192.168.0.1 -b 5000'
 \n
 \n"
 
@@ -27,11 +28,13 @@ DEF_MONTHS='12'
 DEF_DAYS='7'
 DEBUG=false
 SERVER=
+BWLIMIT=
 MOVE_TO_DIR=
 HOSTNAME=
-TMP_MOUNT_POINT="/tmp/comressed_logs_$CURRENT_EPOCH"
+TMP_MOUNT_POINT="/tmp/compressed_logs_$CURRENT_EPOCH"
+PATH="/bin:/sbin:/usr/bin:/usr/sbin:$PATH"
 
-while getopts l:h:c:o:g:d:m:s: flag
+while getopts l:h:c:o:g:d:m:s:b: flag
 do
     case "${flag}" in
         l) LOGS=${OPTARG}
@@ -49,6 +52,8 @@ do
         m) MOVE_TO_DIR=${OPTARG}
            ;;
         s) SERVER=${OPTARG}
+           ;;
+        b) BWLIMIT=${OPTARG}
            ;;
         *) echo -e $usage
            exit 1
@@ -71,6 +76,17 @@ _threshold_days() {
     local days_in_sec=$(( $1*${day_in_sec} ))
     local delta=$(( ${CURRENT_EPOCH}-${days_in_sec} ))
     echo $delta
+}
+
+_check_archived_logs() {
+   stat $1 2>&1 > /dev/null
+   echo $?
+}
+
+_force-umount () {
+    echo -e "\nUmount and cleanup tmp dir: ${TMP_MOUNT_POINT}\n"
+    umount -v ${TMP_MOUNT_POINT}
+    rm -rfv ${TMP_MOUNT_POINT}
 }
 
 case $DEBUG in
@@ -111,8 +127,18 @@ then
     echo "Mount remote folder ${SERVER}:${MOVE_TO_DIR}"
     mkdir -p ${TMP_MOUNT_POINT}
     mount.nfs -v ${SERVER}:${MOVE_TO_DIR}  ${TMP_MOUNT_POINT}
-    mkdir -p ${TMP_MOUNT_POINT}
-    DIRNAME="${TMP_MOUNT_POINT}/"
+    mkdir -p ${TMP_MOUNT_POINT}/{{ inventory_hostname }}
+    DIRNAME="${TMP_MOUNT_POINT}/{{ inventory_hostname }}/"
+fi
+
+if [[ ! -z $BWLIMIT ]]
+then
+    BWLIMIT="--bwlimit=${BWLIMIT}"
+fi
+
+if [[ ! -z $SERVER ]] && [[ ! -z $MOVE_TO_DIR ]]
+then
+    trap _force-umount ERR EXIT
 fi
 
 echo -e "\nRun logrotation: $(date)"
@@ -136,21 +162,24 @@ do
     fi
 done
 
-if [[ ! -z $MOVE_TO_DIR ]] || [[ -z $SERVER ]]
+if [[ $(_check_archived_logs ${LOGS}${SUFFIX}) == 0 ]]
 then
-    echo -e "\nMove archives to: $DIRNAME"
-    if [[ $DEBUG == 'false' ]]
+    if [[ ! -z $MOVE_TO_DIR ]] || [[ -z $SERVER ]]
     then
-        rsync -avz --remove-source-files ${LOGS}${SUFFIX} ${DIRNAME}
-    else
-        echo "rsync -avz --remove-source-files ${LOGS}${SUFFIX} ${DIRNAME}"
+        echo -e "\nMove archives to: $DIRNAME"
+        if [[ $DEBUG == 'false' ]]
+        then
+            rsync -avz --remove-source-files ${BWLIMIT} ${LOGS}${SUFFIX} ${DIRNAME}
+        else
+            echo "rsync -avz --remove-source-files ${BWLIMIT} ${LOGS}${SUFFIX} ${DIRNAME}"
+        fi
     fi
-fi
 
 echo -e "\nRemoving compressed logs older ${COLD_LIMIT:-$DEF_MONTHS} months\n"
+
 cold_threshold=$(_threshold_month ${COLD_LIMIT:-$DEF_MONTHS})
 archives=$(echo ${DIRNAME}$(basename "${LOGS}")${SUFFIX})
-for file in $(ls -1 ${archives})
+for file in $( ls -1 ${archives})
 do
     mtime=$(stat -c %Y $file | awk '{print $1}')
     if [[ $mtime < $cold_threshold ]]
@@ -163,10 +192,7 @@ do
     fi
 done
 
-if [[ ! -z $SERVER ]] && [[ ! -z $MOVE_TO_DIR ]]
-then
-    umount ${TMP_MOUNT_POINT}
-    rm -rf ${TMP_MOUNT_POINT}
 fi
 
 echo -e "\nFinish logrotation: $(date)\n"
+
