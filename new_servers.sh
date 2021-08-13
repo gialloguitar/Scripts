@@ -25,7 +25,7 @@ SCP_TO="scp -P$CON_PORT "
 echo -e "# 1. Change root password prompt: Yes/No \n"
 read -r PROMPT
 if [ $PROMPT == 'Yes' ]; then
-NEW_PASS=$(pwgen -a -1 16)
+NEW_PASS=$(pwgen 16 1 -s)
 echo -e "Generated new password (save it): $NEW_PASS \n"
 $SSH_TO$IP passwd
 else

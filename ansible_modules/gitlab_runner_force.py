@@ -7,7 +7,7 @@ from ansible.module_utils.basic import AnsibleModule
 
 ANSIBLE_METADATA = {
     'metadata_version': '1.0',
-    'supported_by': 'markule@mail.ru'
+    'supported_by': 'stripchat.com'
 }
 
 DOCUMENTATION = '''
@@ -102,7 +102,7 @@ message: Registration of new runner with a next tags: 'build'
         runner: test-runner-01
 '''
 
-GITLAB_URL = 'gitlab.com'
+GITLAB_URL = 'gitlab.stripchat.dev'
 RUNNERS_ENDPOINT = '/api/v4/runners'
 MSG = {
     'reg_token'       : 'For creating a new runner you have to provide valid registration token \'reg_token\' from your Gitlab installation and \'name\' of runner',
@@ -268,13 +268,25 @@ def get_orph_runners(api_url, api_token ):
 
     return all_orph_runners
 
-def get_runners(api_url, api_token):
-    api_query = '{api_url}/all?per_page=500'.format(api_url = api_url)
+def get_available_pages(api_url, api_token):
+    api_query = '{api_url}/all?per_page=100'.format(api_url = api_url)
     r = requests.get(api_query, headers={ 'PRIVATE-TOKEN': api_token } )
-    js = json.loads(r.text)
+    available_pages = r.headers['x-total-pages']
+    return int(available_pages)
+
+def get_runners(api_url, api_token):
+    full_list = []
+    available_pages = get_available_pages(api_url, api_token)
+
+    for page in range(1,available_pages):
+        api_query = '{api_url}/all?per_page=100&page={p}'.format(api_url = api_url, p = page)
+        r = requests.get(api_query, headers={ 'PRIVATE-TOKEN': api_token } )
+        js = json.loads(r.text)
+        full_list += js
+
     all_runners = {}
 
-    for node in js:
+    for node in full_list:
         all_runners[node['description']] = node['id']
 
     return all_runners
