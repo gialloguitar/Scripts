@@ -30,7 +30,7 @@ options:
     gitlab_url:
         description:
             - URL to your GitLab installation
-        default: gitlab.stripchat.dev
+        default: gitlab.com
         required: false
     api_token:
         description:
@@ -102,7 +102,7 @@ message: Registration of new runner with a next tags: 'build'
         runner: test-runner-01
 '''
 
-GITLAB_URL = 'gitlab.stripchat.dev'
+GITLAB_URL = 'gitlab.com'
 RUNNERS_ENDPOINT = '/api/v4/runners'
 MSG = {
     'reg_token'       : 'For creating a new runner you have to provide valid registration token \'reg_token\' from your Gitlab installation and \'name\' of runner',
