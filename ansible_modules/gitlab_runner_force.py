@@ -272,7 +272,7 @@ def get_available_pages(api_url, api_token):
     api_query = '{api_url}/all?per_page=100'.format(api_url = api_url)
     r = requests.get(api_query, headers={ 'PRIVATE-TOKEN': api_token } )
     available_pages = r.headers['x-total-pages']
-    return int(available_pages)
+    return int(available_pages) + 1
 
 def get_runners(api_url, api_token):
     full_list = []
