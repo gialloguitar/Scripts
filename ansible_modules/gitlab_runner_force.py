@@ -7,7 +7,7 @@ from ansible.module_utils.basic import AnsibleModule
 
 ANSIBLE_METADATA = {
     'metadata_version': '1.0',
-    'supported_by': 'stripchat.com'
+    'supported_by': '@gialloguitar'
 }
 
 DOCUMENTATION = '''
