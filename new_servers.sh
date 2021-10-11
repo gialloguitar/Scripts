@@ -10,7 +10,7 @@
 set -e
 
 SERVERS=( $(cat new_servers.txt) )
-ANSIBLE_INIT_SCRIPT='/Users/markule/Workspace/wisebits/ansible/scripts/init.sh'
+ANSIBLE_INIT_SCRIPT='/Users/markule/Workspace/wisebits/infrastructure/ansible/scripts/init.sh'
 PROMPT=''
 
 for IP in ${SERVERS[@]}; do
