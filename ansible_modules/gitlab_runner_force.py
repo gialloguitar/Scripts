@@ -7,7 +7,7 @@ from ansible.module_utils.basic import AnsibleModule
 
 ANSIBLE_METADATA = {
     'metadata_version': '1.0',
-    'supported_by': 'stripchat.com'
+    'supported_by': '@gialloguitar'
 }
 
 DOCUMENTATION = '''
@@ -30,7 +30,7 @@ options:
     gitlab_url:
         description:
             - URL to your GitLab installation
-        default: gitlab.stripchat.dev
+        default: gitlab.com
         required: false
     api_token:
         description:
@@ -102,7 +102,7 @@ message: Registration of new runner with a next tags: 'build'
         runner: test-runner-01
 '''
 
-GITLAB_URL = 'gitlab.stripchat.dev'
+GITLAB_URL = 'gitlab.com'
 RUNNERS_ENDPOINT = '/api/v4/runners'
 MSG = {
     'reg_token'       : 'For creating a new runner you have to provide valid registration token \'reg_token\' from your Gitlab installation and \'name\' of runner',
@@ -272,7 +272,7 @@ def get_available_pages(api_url, api_token):
     api_query = '{api_url}/all?per_page=100'.format(api_url = api_url)
     r = requests.get(api_query, headers={ 'PRIVATE-TOKEN': api_token } )
     available_pages = r.headers['x-total-pages']
-    return int(available_pages)
+    return int(available_pages) + 1
 
 def get_runners(api_url, api_token):
     full_list = []
